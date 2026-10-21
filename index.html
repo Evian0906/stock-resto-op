@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Stock Resto</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f7fb;color:#172033}
+header{background:#111827;color:white;padding:22px 18px 18px;position:sticky;top:0;z-index:5}
+header h1{margin:0;font-size:25px}header p{margin:4px 0 0;color:#cbd5e1;font-size:13px}
+nav{display:flex;gap:8px;overflow:auto;padding:10px;background:white;position:sticky;top:78px;z-index:4;border-bottom:1px solid #e5e7eb}
+nav button{border:0;background:#eef2f7;border-radius:12px;padding:10px 13px;white-space:nowrap;font-weight:600;color:#475569}
+nav button.active{background:#111827;color:white}
+main{max-width:850px;margin:auto;padding:16px 14px 90px}.view{display:none}.view.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.card{background:white;border:1px solid #e5e7eb;border-radius:16px;padding:15px;box-shadow:0 2px 8px #00000008}
+.kpi{font-size:25px;font-weight:800;margin-top:5px}.muted{color:#64748b;font-size:13px}.section{margin:18px 0 10px;font-size:18px;font-weight:800}
+button,.btn{cursor:pointer}.primary{background:#111827;color:#fff;border:0;border-radius:12px;padding:12px 15px;font-weight:700}.secondary{background:#eef2f7;color:#172033;border:0;border-radius:12px;padding:10px 13px;font-weight:650}
+.danger{background:#fee2e2;color:#991b1b}.success{background:#dcfce7;color:#166534}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}.product{margin-bottom:10px}.product h3{margin:0 0 3px}.stock{font-size:21px;font-weight:800}.low{color:#b45309}.out{color:#dc2626}.ok{color:#15803d}
+.badge{display:inline-block;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:700;background:#eef2f7;color:#475569}
+input,select{width:100%;padding:12px;border:1px solid #d8dee8;border-radius:11px;background:white;font-size:15px;margin-top:5px}
+label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:11px}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.full{grid-column:1/-1}
+.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+dialog{border:0;border-radius:18px;width:min(95%,520px);padding:0;box-shadow:0 20px 60px #0005}dialog::backdrop{background:#0007}.modal{padding:20px}.modal h2{margin-top:0}
+table{width:100%;border-collapse:collapse;font-size:13px;background:white;border-radius:14px;overflow:hidden}th,td{text-align:left;padding:11px;border-bottom:1px solid #edf0f4}th{color:#64748b}
+.search{margin-bottom:12px}
+.empty{text-align:center;padding:30px;color:#64748b}
+.small{font-size:12px}
+@media(min-width:650px){.grid{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header><h1>📦 Stock Resto</h1><p>Gestion simple de ton stock</p></header>
+<nav id="nav">
+<button class="active" data-view="dashboard">Accueil</button><button data-view="products">Produits</button>
+<button data-view="inventory">Inventaire</button><button data-view="history">Historique</button>
+</nav>
+<main>
+<section id="dashboard" class="view active">
+<div class="grid">
+<div class="card"><div class="muted">Produits</div><div class="kpi" id="kProducts">0</div></div>
+<div class="card"><div class="muted">Stock faible</div><div class="kpi" id="kLow">0</div></div>
+<div class="card"><div class="muted">Ruptures</div><div class="kpi" id="kOut">0</div></div>
+<div class="card"><div class="muted">Valeur du stock</div><div class="kpi" id="kValue">0 €</div></div>
+</div>
+<div class="section">⚠️ À surveiller</div><div id="alerts"></div>
+<div class="section">Actions rapides</div>
+<div class="card actions"><button class="primary" onclick="openProduct()">+ Ajouter un produit</button><button class="secondary" onclick="openMove('in')">+ Réception</button><button class="secondary" onclick="openMove('out')">− Sortie</button></div>
+</section>
+
+<section id="products" class="view">
+<div class="row"><div><div class="section">📦 Produits</div></div><button class="primary" onclick="openProduct()">+ Ajouter</button></div>
+<input class="search" id="search" placeholder="🔎 Rechercher un produit..." oninput="renderProducts()">
+<div id="productList"></div>
+</section>
+
+<section id="inventory" class="view">
+<div class="section">📋 Inventaire</div>
+<p class="muted">Corrige directement les quantités réellement présentes. Une correction est conservée dans l'historique.</p>
+<div id="inventoryList"></div>
+</section>
+
+<section id="history" class="view">
+<div class="section">📜 Historique</div><div id="historyList"></div>
+</section>
+</main>
+
+<dialog id="productDialog"><div class="modal">
+<h2 id="productTitle">Ajouter un produit</h2>
+<form id="productForm">
+<input type="hidden" id="pid">
+<label>Nom du produit<input id="pname" required placeholder="Ex. Saumon"></label>
+<div class="formgrid">
+<label>Catégorie<select id="pcat"><option>Viandes</option><option>Poissons</option><option>Crèmerie</option><option>Fruits & légumes</option><option>Épicerie</option><option>B.O.F.</option><option>Boissons</option><option>Autre</option></select></label>
+<label>Unité<select id="unit"><option>kg</option><option>g</option><option>L</option><option>cl</option><option>pièce</option><option>carton</option></select></label>
+<label>Stock actuel<input id="qty" type="number" step="0.01" min="0" value="0"></label>
+<label>Stock minimum<input id="min" type="number" step="0.01" min="0" value="0"></label>
+<label>Prix d'achat (€ / unité)<input id="price" type="number" step="0.01" min="0" value="0"></label>
+<label>Fournisseur<input id="supplier" placeholder="Ex. Métro"></label>
+</div>
+<label>DLC / DDM<input id="expiry" type="date"></label>
+<div class="actions"><button type="button" class="secondary" onclick="productDialog.close()">Annuler</button><button class="primary">Enregistrer</button></div>
+</form></div></dialog>
+
+<dialog id="moveDialog"><div class="modal">
+<h2 id="moveTitle">Réception</h2><form id="moveForm">
+<label>Produit<select id="mproduct" required></select></label>
+<label>Quantité<input id="mqty" type="number" step="0.01" min="0.01" required></label>
+<div id="extraReception">
+<label>Prix d'achat (€ / unité)<input id="mprice" type="number" step="0.01" min="0"></label>
+<label>Fournisseur<input id="msupplier" placeholder="Fournisseur"></label>
+<label>DLC / DDM<input id="mexpiry" type="date"></label>
+</div>
+<label>Note<input id="mnote" placeholder="Facultatif"></label>
+<div class="actions"><button type="button" class="secondary" onclick="moveDialog.close()">Annuler</button><button class="primary">Valider</button></div>
+</form></div></dialog>
+
+<dialog id="editDialog"><div class="modal">
+<h2>Modifier l'inventaire</h2><form id="editForm">
+<input type="hidden" id="eid"><div id="ename" style="font-weight:800;margin-bottom:10px"></div>
+<label>Quantité réellement présente<input id="eqty" type="number" step="0.01" min="0" required></label>
+<div class="actions"><button type="button" class="secondary" onclick="editDialog.close()">Annuler</button><button class="primary">Enregistrer</button></div>
+</form></div></dialog>
+
+<script>
+const KEY='stockRestoV1';
+let data=JSON.parse(localStorage.getItem(KEY)||'null')||{products:[],moves:[]};
+let moveType='in';
+const $=id=>document.getElementById(id);
+const save=()=>{localStorage.setItem(KEY,JSON.stringify(data));renderAll()};
+const money=n=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR'}).format(n||0);
+const fmt=n=>Number(n||0).toLocaleString('fr-FR',{maximumFractionDigits:2});
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+function status(p){if(p.qty<=0)return ['out','Rupture'];if(p.qty<=p.min)return ['low','Stock faible'];return ['ok','OK']}
+function renderAll(){renderDashboard();renderProducts();renderInventory();renderHistory()}
+function renderDashboard(){
+$('kProducts').textContent=data.products.length;
+$('kLow').textContent=data.products.filter(p=>p.qty>0&&p.qty<=p.min).length;
+$('kOut').textContent=data.products.filter(p=>p.qty<=0).length;
+$('kValue').textContent=money(data.products.reduce((s,p)=>s+p.qty*p.price,0));
+let a=data.products.filter(p=>p.qty<=p.min).sort((x,y)=>x.qty-y.qty);
+$('alerts').innerHTML=a.length?a.map(p=>`<div class="card product"><div class="row"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.cat)} · ${fmt(p.qty)} ${esc(p.unit)} / min. ${fmt(p.min)}</div></div><span class="badge ${p.qty<=0?'danger':'low'}">${p.qty<=0?'RUPTURE':'FAIBLE'}</span></div><div class="actions"><button class="secondary" onclick="openMove('in',${p.id})">+ Réception</button><button class="secondary" onclick="openMove('out',${p.id})">− Sortie</button></div></div>`).join(''):'<div class="card empty">Aucune alerte 🎉</div>';
+}
+function renderProducts(){
+let q=($('search')?.value||'').toLowerCase();
+let ps=data.products.filter(p=>(p.name+' '+p.cat+' '+p.supplier).toLowerCase().includes(q));
+$('productList').innerHTML=ps.length?ps.map(p=>{let [cl,st]=status(p);return `<div class="card product"><div class="row"><div><h3>${esc(p.name)}</h3><div class="muted">${esc(p.cat)} · ${esc(p.supplier||'Sans fournisseur')}</div></div><div style="text-align:right"><div class="stock ${cl}">${fmt(p.qty)} ${esc(p.unit)}</div><span class="badge">${st}</span></div></div><div class="small muted">Minimum : ${fmt(p.min)} ${esc(p.unit)} · ${money(p.price)}/${esc(p.unit)}${p.expiry?' · DLC '+new Date(p.expiry+'T12:00:00').toLocaleDateString('fr-FR'):''}</div><div class="actions"><button class="secondary" onclick="openMove('in',${p.id})">+ Entrée</button><button class="secondary" onclick="openMove('out',${p.id})">− Sortie</button><button class="secondary" onclick="editProduct(${p.id})">✏️</button><button class="secondary danger" onclick="deleteProduct(${p.id})">Supprimer</button></div></div>`}).join(''):'<div class="card empty">Aucun produit. Ajoute ton premier produit.</div>';
+}
+function renderInventory(){
+$('inventoryList').innerHTML=data.products.length?data.products.map(p=>`<div class="card product"><div class="row"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.unit)} · minimum ${fmt(p.min)}</div></div><div class="stock">${fmt(p.qty)}</div></div><button class="secondary" style="margin-top:10px" onclick="openInventory(${p.id})">Modifier la quantité</button></div>`).join(''):'<div class="card empty">Aucun produit.</div>';
+}
+function renderHistory(){
+let ms=[...data.moves].reverse();
+$('historyList').innerHTML=ms.length?`<div style="overflow:auto"><table><thead><tr><th>Date</th><th>Produit</th><th>Mouvement</th><th>Qté</th><th>Détails</th></tr></thead><tbody>${ms.map(m=>`<tr><td>${new Date(m.date).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}</td><td><b>${esc(m.name)}</b></td><td>${m.type==='in'?'Entrée':m.type==='out'?'Sortie':'Inventaire'}</td><td>${m.delta>0?'+':''}${fmt(m.delta)} ${esc(m.unit)}</td><td>${esc(m.details||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="card empty">Aucun mouvement enregistré.</div>';
+}
+function openProduct(id=null){
+$('productForm').reset();$('pid').value=id||'';
+if(id){let p=data.products.find(x=>x.id===id);$('productTitle').textContent='Modifier le produit';$('pname').value=p.name;$('pcat').value=p.cat;$('unit').value=p.unit;$('qty').value=p.qty;$('min').value=p.min;$('price').value=p.price;$('supplier').value=p.supplier||'';$('expiry').value=p.expiry||''}else{$('productTitle').textContent='Ajouter un produit';$('qty').value=0;$('min').value=0;$('price').value=0}
+productDialog.showModal()
+}
+$('productForm').onsubmit=e=>{e.preventDefault();let id=Number($('pid').value),p={id:id||Date.now(),name:$('pname').value.trim(),cat:$('pcat').value,unit:$('unit').value,qty:Number($('qty').value),min:Number($('min').value),price:Number($('price').value),supplier:$('supplier').value.trim(),expiry:$('expiry').value};if(id){let old=data.products.find(x=>x.id===id);if(old.qty!==p.qty)data.moves.push({date:new Date().toISOString(),name:p.name,unit:p.unit,delta:p.qty-old.qty,type:'inventory',details:'Modification du produit'});data.products[data.products.findIndex(x=>x.id===id)]=p}else{data.products.push(p);data.moves.push({date:new Date().toISOString(),name:p.name,unit:p.unit,delta:p.qty,type:'inventory',details:'Création du produit'})}productDialog.close();save()}
+function editProduct(id){openProduct(id)}
+function deleteProduct(id){let p=data.products.find(x=>x.id===id);if(confirm('Supprimer '+p.name+' ?')){data.products=data.products.filter(x=>x.id!==id);save()}}
+function openMove(type='in',id=null){
+moveType=type;$('moveTitle').textContent=type==='in'?'Réception de marchandise':'Sortie de stock';$('moveForm').reset();
+$('extraReception').style.display=type==='in'?'block':'none';
+$('mproduct').innerHTML=data.products.map(p=>`<option value="${p.id}">${esc(p.name)} — ${fmt(p.qty)} ${esc(p.unit)}</option>`).join('');
+if(id)$('mproduct').value=id;
+moveDialog.showModal()
+}
+$('moveForm').onsubmit=e=>{e.preventDefault();let p=data.products.find(x=>x.id==$('mproduct').value),q=Number($('mqty').value);if(!p||q<=0)return;if(moveType==='out'&&q>p.qty&&!confirm('La sortie dépasse le stock actuel. Continuer ?'))return;p.qty+=moveType==='in'?q:-q;if(moveType==='in'){if($('mprice').value)p.price=Number($('mprice').value);if($('msupplier').value)p.supplier=$('msupplier').value.trim();if($('mexpiry').value)p.expiry=$('mexpiry').value}data.moves.push({date:new Date().toISOString(),name:p.name,unit:p.unit,delta:moveType==='in'?q:-q,type:moveType,details:[$('msupplier').value&&('Fournisseur: '+$('msupplier').value),$('mprice').value&&('Prix: '+money(Number($('mprice').value))),$('mexpiry').value&&('DLC: '+$('mexpiry').value),$('mnote').value].filter(Boolean).join(' · ')});moveDialog.close();save()}
+function openInventory(id){let p=data.products.find(x=>x.id===id);$('eid').value=id;$('ename').textContent=p.name;$('eqty').value=p.qty;editDialog.showModal()}
+$('editForm').onsubmit=e=>{e.preventDefault();let p=data.products.find(x=>x.id==$('eid').value),old=p.qty,n=Number($('eqty').value);p.qty=n;data.moves.push({date:new Date().toISOString(),name:p.name,unit:p.unit,delta:n-old,type:'inventory',details:`Inventaire (${fmt(old)} → ${fmt(n)})`});editDialog.close();save()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));$(b.dataset.view).classList.add('active')});
+renderAll();
+</script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js"))}</script>
+</body></html>

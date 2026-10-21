@@ -1,0 +1,10 @@
+{
+  "name": "Stock Resto",
+  "short_name": "Stock Resto",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#111827",
+  "lang": "fr-FR",
+  "description": "Gestion de stock pour restaurant"
+}
